@@ -6,7 +6,8 @@ import Relude
 import qualified System.Directory as Dir
 import System.FilePath ((</>))
 import qualified System.IO as IO
-import Control.Monad.Trans.Resource (allocate, runResourceT)
+import Control.Monad.Trans.Resource (allocate, runResourceT, ResourceT, ReleaseKey)
+import qualified System.IO as Io
 
 getDataDir :: IO FilePath
 getDataDir = do
@@ -22,12 +23,12 @@ writeGreetingFile = do
     IO.hPutStrLn h "world"
     IO.hClose h
 
+fileResource :: FilePath -> IOMode -> ResourceT IO (ReleaseKey, Handle)
+fileResource path mode = allocate (Io.openFile path mode) IO.hClose
+
 writeGreetingSafe :: IO ()
--- @IO es un type application y permite informar a GHCI que el tipo base es IO. Se puede eliminar si de define el tipo de la función
 writeGreetingSafe = runResourceT @IO do
     dir <- liftIO getDataDir
-    (_releaseKey, h) <- allocate
-        (IO.openFile (dir </> "greeting-safe.txt") WriteMode)
-        IO.hClose
+    (_releaseKey, h) <- fileResource (dir </> "greeting-safe.txt") WriteMode
     liftIO (IO.hPutStrLn h "hello")
     liftIO (IO.hPutStrLn h "world")
