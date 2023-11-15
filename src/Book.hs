@@ -9,6 +9,7 @@ import qualified System.IO as IO
 import Control.Monad.Trans.Resource (allocate, runResourceT, ResourceT, ReleaseKey)
 import qualified System.IO as Io
 import System.IO (hShow)
+import qualified Control.Exception.Safe as Ex
 
 getDataDir :: IO FilePath
 getDataDir = do
@@ -42,3 +43,30 @@ handlePrintTest = do
     hShow h >>= print
     IO.hClose h
     hShow h >>= print
+
+howManyHandles :: IO ()
+howManyHandles = runResourceT @IO do
+    hs <- openManyHandles
+    putStrLn ("Opened " <> show (length hs) <> " handles")
+
+openManyHandles :: ResourceT IO [Handle]
+openManyHandles = do
+    h <- fileResourceMaybe
+    case h of
+      Nothing -> pure []
+      Just h' -> do
+        hs <- openManyHandles
+        pure $ h' : hs
+
+
+fileResourceMaybe :: ResourceT IO (Maybe Handle)
+fileResourceMaybe = do
+  dir <- liftIO getDataDir
+  result <- Ex.tryIO do
+    (_, h) <- allocate (IO.openFile (dir </> "greeting.txt") ReadMode) IO.hClose
+    pure h
+  case result of
+    Right x -> pure $ Just x
+    Left e -> do
+      print $ displayException e
+      pure Nothing
