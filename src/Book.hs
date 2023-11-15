@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Avoid lambda" #-}
 module Book where
 
 import           Prelude                      ()
@@ -11,12 +12,14 @@ import qualified Data.Char                    as Char
 import           Data.Text                    ()
 import qualified Data.Text                    as T
 
+import qualified Data.ByteString              as BS
 import qualified Data.Text.IO                 as T
 import qualified System.Directory             as Dir
 import           System.FilePath              ((</>))
 import qualified System.IO                    as IO
 import qualified System.IO                    as Io
 import           System.IO                    (hShow)
+
 
 
 getDataDir :: IO FilePath
@@ -156,3 +159,20 @@ repeatUntil producer isEnd action = continue
       if isEnd chunk
         then return ()
         else action chunk >> continue
+
+exampleBytes :: [Word8]
+exampleBytes = [104, 101, 108, 108, 111] :: [Word8]
+
+copyGreetingFile :: IO ()
+copyGreetingFile = runResourceT @IO do
+  dir <- liftIO getDataDir
+  (_, h1) <-
+    binaryFileResource (dir </> "greeting.txt") ReadMode
+  (_, h2) <-
+    binaryFileResource (dir </> "greeting2.txt") WriteMode
+  liftIO $ repeatUntil (BS.hGetSome h1 1024) BS.null \chunk ->
+    BS.hPutStr h2 chunk
+
+binaryFileResource :: FilePath -> IOMode -> ResourceT IO (ReleaseKey, Handle)
+binaryFileResource path mode =
+  allocate (IO.openBinaryFile path mode) IO.hClose
