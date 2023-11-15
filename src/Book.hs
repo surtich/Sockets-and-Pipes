@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use unless" #-}
 module Book where
 
 import           Prelude                      ()
@@ -83,3 +85,18 @@ helloTextFile = runResourceT @IO do
   liftIO do
     T.hPutStrLn h (T.pack "hello")
     T.hPutStrLn h (T.pack "world")
+
+printFileContentsUpperCase :: IO ()
+printFileContentsUpperCase = runResourceT @IO do
+  dir <- liftIO getDataDir
+  (_, h) <- fileResource (dir </> "greeting.txt") ReadMode
+  liftIO (printCapitalizedText h)
+
+printCapitalizedText :: Handle -> IO ()
+printCapitalizedText h = continue
+  where
+    continue = do
+      chunk <- T.hGetChunk h
+      (if T.null chunk then return () else (do
+        T.putStr (T.toUpper chunk)
+        continue))
