@@ -8,6 +8,7 @@ import System.FilePath ((</>))
 import qualified System.IO as IO
 import Control.Monad.Trans.Resource (allocate, runResourceT, ResourceT, ReleaseKey)
 import qualified System.IO as Io
+import System.IO (hShow)
 
 getDataDir :: IO FilePath
 getDataDir = do
@@ -32,3 +33,12 @@ writeGreetingSafe = runResourceT @IO do
     (_releaseKey, h) <- fileResource (dir </> "greeting-safe.txt") WriteMode
     liftIO (IO.hPutStrLn h "hello")
     liftIO (IO.hPutStrLn h "world")
+
+handlePrintTest :: IO ()
+handlePrintTest = do 
+    dir <- getDataDir
+    h <- IO.openFile (dir </> "greeting.txt") WriteMode
+    print h
+    hShow h >>= print
+    IO.hClose h
+    hShow h >>= print
