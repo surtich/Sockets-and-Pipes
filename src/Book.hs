@@ -16,7 +16,9 @@ import qualified Data.ByteString              as BS
 import qualified Data.Text.Encoding           as T
 import qualified Data.Text.IO                 as T
 
-import qualified ASCII                        as BS
+import           Network.Socket               (Socket)
+import qualified Network.Socket               as S
+import qualified Network.Socket.ByteString    as S
 import qualified System.Directory             as Dir
 import           System.FilePath              ((</>))
 import qualified System.IO                    as IO
@@ -206,3 +208,25 @@ asciiUpperByte :: Word8 -> Word8
 asciiUpperByte w
   | w >= 97 && w <= 122 = w - 32
   | otherwise           = w
+
+makeFriend :: S.SockAddr -> IO ()
+makeFriend address = do
+  s <- S.socket S.AF_INET S.Stream S.defaultProtocol -- 1
+  S.setSocketOption s S.UserTimeout 1000
+  S.connect s address -- 2
+  S.sendAll s $ T.encodeUtf8 $ -- 3
+    T.pack "Hello, will you be my friend?"
+  repeatUntil (S.recv s 1024) BS.null BS.putStr  -- 4
+
+makeFriendSafely :: S.SockAddr -> IO ()
+makeFriendSafely address = runResourceT @IO do
+  (_, s) <- allocate
+    ( S.socket S.AF_INET S.Stream S.defaultProtocol)
+    S.close
+  liftIO do
+    S.setSocketOption s S.UserTimeout 10000
+    S.connect s address -- 2
+    S.sendAll s $ T.encodeUtf8 $ -- 3
+      T.pack "Hello, will you be my friend?"
+    repeatUntil (S.recv s 1024) BS.null BS.putStr
+    S.gracefulClose s 1000
