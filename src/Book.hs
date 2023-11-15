@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# HLINT ignore "Avoid lambda" #-}
 module Book where
 
@@ -16,6 +17,8 @@ import qualified Data.ByteString              as BS
 import qualified Data.Text.Encoding           as T
 import qualified Data.Text.IO                 as T
 
+import qualified ASCII                        as A
+import qualified ASCII.Char                   as A
 import           Network.Socket               (Socket)
 import qualified Network.Socket               as S
 import qualified Network.Socket.ByteString    as S
@@ -24,6 +27,7 @@ import           System.FilePath              ((</>))
 import qualified System.IO                    as IO
 import qualified System.IO                    as Io
 import           System.IO                    (hShow)
+
 
 
 
@@ -268,8 +272,7 @@ line x = x <> fromString "\r\n"
 
 helloRequestString :: ByteString
 helloRequestString =
-  line (fromString "GET /hello.txt HTTP/1.1") <>
-  line (fromString "User-Agent: curl/7.16.3") <>
-  line (fromString "Accept-Language: en, mi") <>
-  line (fromString "")
-
+  line [A.string|GET /hello.txt HTTP/1.1|] <>
+  line [A.string|User-Agent: curl/7.16.3|] <>
+  line [A.string|Accept-Language: en, mi|] <>
+  line [A.string||]
