@@ -1,15 +1,20 @@
 module Book where
 
-import Prelude ()
-import Relude
+import           Prelude                      ()
+import           Relude
 
-import qualified System.Directory as Dir
-import System.FilePath ((</>))
-import qualified System.IO as IO
-import Control.Monad.Trans.Resource (allocate, runResourceT, ResourceT, ReleaseKey)
-import qualified System.IO as Io
-import System.IO (hShow)
-import qualified Control.Exception.Safe as Ex
+import qualified Control.Exception.Safe       as Ex
+import           Control.Monad.Trans.Resource (ReleaseKey, ResourceT, allocate,
+                                               runResourceT)
+import qualified Data.Char                    as Char
+import qualified Data.Text                    as T
+import qualified Data.Text.IO                 as T
+import qualified System.Directory             as Dir
+import           System.FilePath              ((</>))
+import qualified System.IO                    as IO
+import qualified System.IO                    as Io
+import           System.IO                    (hShow)
+
 
 getDataDir :: IO FilePath
 getDataDir = do
@@ -36,7 +41,7 @@ writeGreetingSafe = runResourceT @IO do
     liftIO (IO.hPutStrLn h "world")
 
 handlePrintTest :: IO ()
-handlePrintTest = do 
+handlePrintTest = do
     dir <- getDataDir
     h <- IO.openFile (dir </> "greeting.txt") WriteMode
     print h
@@ -70,3 +75,11 @@ fileResourceMaybe = do
     Left e -> do
       print $ displayException e
       pure Nothing
+
+helloTextFile :: IO ()
+helloTextFile = runResourceT @IO do
+  dir <- liftIO getDataDir
+  (_, h) <- fileResource (dir </> "greeting.txt") WriteMode
+  liftIO do
+    T.hPutStrLn h (T.pack "hello")
+    T.hPutStrLn h (T.pack "world")
