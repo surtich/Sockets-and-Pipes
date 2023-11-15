@@ -1,0 +1,3 @@
+.cabal-fmt*
+.vscode
+dist-newstyle
