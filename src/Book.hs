@@ -233,21 +233,33 @@ makeFriendSafely address = runResourceT @IO do
 
 makeFriendAddrInfo :: S.AddrInfo -> IO ()
 makeFriendAddrInfo addressInfo = runResourceT @IO do
-  (_, s) <- allocate (S.openSocket addressInfo) S.close
+  (_, s) <- openAndConnect addressInfo
   liftIO do
-    S.setSocketOption s S.UserTimeout 1000
-    S.connect s (S.addrAddress addressInfo)
     S.sendAll s $ T.encodeUtf8 $
       T.pack "Hello, will you be my friend?"
     repeatUntil (S.recv s 1024) BS.null BS.putStr
     S.gracefulClose s 1000
 
 findHaskellWebsite :: IO S.AddrInfo
-findHaskellWebsite = do
+findHaskellWebsite = resolve "80" "www.haskell.org"
+
+
+openAndConnect :: S.AddrInfo -> ResourceT IO (ReleaseKey, Socket)
+openAndConnect addressInfo = allocate setup S.close
+  where
+    setup = do
+      s <- S.openSocket addressInfo
+      S.setSocketOption s S.UserTimeout 1000
+      S.connect s (S.addrAddress addressInfo)
+      return s
+
+resolve :: S.ServiceName -> S.HostName -> IO S.AddrInfo
+resolve port host = do
   addrInfos <- S.getAddrInfo
     (Just S.defaultHints { S.addrSocketType = S.Stream })
-    (Just "www.haskell.org")
-    (Just "http")
+    (Just host)
+    (Just port)
   case addrInfos of
     []    -> fail "getAddrInfo returned []"
     x : _ -> return x
+
