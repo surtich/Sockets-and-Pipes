@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-{-# HLINT ignore "Use unless" #-}
 module Book where
 
 import           Prelude                      ()
@@ -9,7 +8,9 @@ import qualified Control.Exception.Safe       as Ex
 import           Control.Monad.Trans.Resource (ReleaseKey, ResourceT, allocate,
                                                runResourceT)
 import qualified Data.Char                    as Char
+import           Data.Text                    ()
 import qualified Data.Text                    as T
+
 import qualified Data.Text.IO                 as T
 import qualified System.Directory             as Dir
 import           System.FilePath              ((</>))
@@ -97,24 +98,61 @@ printCapitalizedText h = continue
   where
     continue = do
       chunk <- T.hGetChunk h
-      (if T.null chunk then return () else (do
+      unless (T.null chunk) (do
         T.putStr (T.toUpper chunk)
-        continue))
+        continue)
 
 repeatUntilIO :: IO chunk -- ^ Producer of chunks
   -> (chunk -> Bool) -- ^ Does chunk indicate end of file?
   -> (chunk -> IO x) -- ^ What to do with each chunk
   -> IO ()
-repeatUntilIO producer isEnd action = continue
-  where
-    continue = do
-      chunk <- producer
-      if isEnd chunk
-        then return ()
-        else action chunk >> continue
+repeatUntilIO = repeatUntil
 
 printFileContentsUpperCase2 :: IO ()
 printFileContentsUpperCase2 = runResourceT @IO do
   dir <- liftIO getDataDir
   (_, h) <- fileResource (dir </> "greeting.txt") ReadMode
   liftIO (repeatUntilIO (T.hGetChunk h) T.null (T.putStr . T.toUpper))
+
+digitsOnly :: Text -> Text
+digitsOnly = T.filter Char.isDigit
+
+capitalizeLast :: Text -> Text
+capitalizeLast xs = T.init xs <> T.singleton (Char.toUpper (T.last xs))
+
+unParen :: Text -> Maybe Text
+unParen xs = case T.unsnoc xs of
+  Nothing       -> Nothing
+  Just (xs', x) -> if x == ')' then Just xs' else Nothing
+
+
+characterCount :: FilePath -> IO Int
+characterCount path = runResourceT @IO do
+  (_, h) <- fileResource path ReadMode
+  liftIO (countCharacters h)
+
+countCharacters :: Handle -> IO Int
+countCharacters h = do
+  chunk <- T.hGetChunk h
+  if T.null chunk
+    then return 0
+    else do
+      rest <- countCharacters h
+      return (T.length chunk + rest)
+
+unless' :: Bool -> IO () -> IO ()
+unless' True  _ = return ()
+unless' False x = x
+
+when' :: Bool -> IO () -> IO ()
+when' True  x = x
+when' False _ = return ()
+
+repeatUntil :: (Monad m) => m chunk -> (chunk -> Bool) -> (chunk -> m x) -> m ()
+repeatUntil producer isEnd action = continue
+  where
+    continue = do
+      chunk <- producer
+      if isEnd chunk
+        then return ()
+        else action chunk >> continue
