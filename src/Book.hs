@@ -263,3 +263,13 @@ resolve port host = do
     []    -> fail "getAddrInfo returned []"
     x : _ -> return x
 
+line :: BS.ByteString -> BS.ByteString
+line x = x <> fromString "\r\n"
+
+helloRequestString :: ByteString
+helloRequestString =
+  line (fromString "GET /hello.txt HTTP/1.1") <>
+  line (fromString "User-Agent: curl/7.16.3") <>
+  line (fromString "Accept-Language: en, mi") <>
+  line (fromString "")
+
