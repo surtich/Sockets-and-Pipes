@@ -13,7 +13,10 @@ import           Data.Text                    ()
 import qualified Data.Text                    as T
 
 import qualified Data.ByteString              as BS
+import qualified Data.Text.Encoding           as T
 import qualified Data.Text.IO                 as T
+
+import qualified ASCII                        as BS
 import qualified System.Directory             as Dir
 import           System.FilePath              ((</>))
 import qualified System.IO                    as IO
@@ -176,3 +179,30 @@ copyGreetingFile = runResourceT @IO do
 binaryFileResource :: FilePath -> IOMode -> ResourceT IO (ReleaseKey, Handle)
 binaryFileResource path mode =
   allocate (IO.openBinaryFile path mode) IO.hClose
+
+
+helloByteString :: IO ()
+helloByteString = do
+  IO.hSetBinaryMode stdout True
+  BS.hPut stdout (BS.pack helloBytes)
+
+helloBytes :: [Word8]
+helloBytes = [
+  104, 101, 108, 108, 111, -- hello
+  32, -- space
+  119, 111, 114, 108, 100, 33, -- world!
+  10 ]
+
+
+greet :: BS.ByteString -> IO ()
+greet nameBS = case T.decodeUtf8' nameBS of
+  Left _         -> putStrLn "Invalid byte string"
+  Right nameText -> T.putStrLn (T.pack "Hello, " <> nameText)
+
+asciiUpper :: BS.ByteString -> BS.ByteString
+asciiUpper = BS.map asciiUpperByte
+
+asciiUpperByte :: Word8 -> Word8
+asciiUpperByte w
+  | w >= 97 && w <= 122 = w - 32
+  | otherwise           = w
