@@ -100,3 +100,21 @@ printCapitalizedText h = continue
       (if T.null chunk then return () else (do
         T.putStr (T.toUpper chunk)
         continue))
+
+repeatUntilIO :: IO chunk -- ^ Producer of chunks
+  -> (chunk -> Bool) -- ^ Does chunk indicate end of file?
+  -> (chunk -> IO x) -- ^ What to do with each chunk
+  -> IO ()
+repeatUntilIO producer isEnd action = continue
+  where
+    continue = do
+      chunk <- producer
+      if isEnd chunk
+        then return ()
+        else action chunk >> continue
+
+printFileContentsUpperCase2 :: IO ()
+printFileContentsUpperCase2 = runResourceT @IO do
+  dir <- liftIO getDataDir
+  (_, h) <- fileResource (dir </> "greeting.txt") ReadMode
+  liftIO (repeatUntilIO (T.hGetChunk h) T.null (T.putStr . T.toUpper))
