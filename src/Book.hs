@@ -19,14 +19,16 @@ import qualified Data.Text.IO                 as T
 
 import qualified ASCII                        as A
 import qualified ASCII.Char                   as A
+import           Network.Simple.TCP           (HostPreference (..), serve)
+import qualified Network.Simple.TCP           as Net
 import           Network.Socket               (Socket)
 import qualified Network.Socket               as S
 import qualified Network.Socket.ByteString    as S
 import qualified System.Directory             as Dir
 import           System.FilePath              ((</>))
 import qualified System.IO                    as IO
-import qualified System.IO                    as Io
 import           System.IO                    (hShow)
+
 
 
 
@@ -46,7 +48,7 @@ writeGreetingFile = do
     IO.hClose h
 
 fileResource :: FilePath -> IOMode -> ResourceT IO (ReleaseKey, Handle)
-fileResource path mode = allocate (Io.openFile path mode) IO.hClose
+fileResource path mode = allocate (IO.openFile path mode) IO.hClose
 
 writeGreetingSafe :: IO ()
 writeGreetingSafe = runResourceT @IO do
@@ -270,9 +272,49 @@ resolve port host = do
 line :: BS.ByteString -> BS.ByteString
 line x = x <> fromString "\r\n"
 
+
+helloResponseString :: ByteString
+helloResponseString =
+  line [A.string|HTTP/1.1 200 OK|] <>
+  line [A.string|Content-Type: text/plain; charset=us-ascii|] <>
+  line [A.string|Content-Length: 6|] <>
+  line [A.string||] <>
+  [A.string|Hello!|]
+
+
+ourFirstServer :: IO a
+ourFirstServer = serve @IO HostAny "8000" \(s, a) -> do
+  putStrLn ("New connection from " <> show a) -- 1
+  Net.send s helloResponseString -- 2
+
+repeatUntilNothing :: Monad m => m (Maybe chunk) -> (chunk -> m x) -> m ()
+repeatUntilNothing getChunkMaybe action = continue
+  where
+    continue = do
+      chunkMaybe <- getChunkMaybe
+      case chunkMaybe of
+        Nothing    -> return ()
+        Just chunk -> action chunk >> continue
+
+repeatUntil' :: Monad m => m chunk -> (chunk -> Bool) -> (chunk -> m x) -> m ()
+repeatUntil' producer isEnd = repeatUntilNothing getChunkMaybe
+  where getChunkMaybe = producer >>= \chunk -> if   isEnd chunk
+                                               then return (Just chunk)
+                                               else return Nothing
+
 helloRequestString :: ByteString
 helloRequestString =
-  line [A.string|GET /hello.txt HTTP/1.1|] <>
-  line [A.string|User-Agent: curl/7.16.3|] <>
-  line [A.string|Accept-Language: en, mi|] <>
+  line [A.string|GET / HTTP/1.1|] <>
+  line [A.string|Host: haskell.org|] <>
+  line [A.string|Connection: close|] <>
   line [A.string||]
+
+testHello :: IO ()
+testHello = runResourceT @IO do
+  addressInfo <- liftIO findHaskellWebsite
+  (_releaseKey, s) <- openAndConnect addressInfo
+  liftIO do
+    Net.send s helloRequestString
+    repeatUntilNothing (Net.recv s 1024) BS.putStr
+    Net.closeSock s
+
