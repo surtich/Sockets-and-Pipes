@@ -19,6 +19,8 @@ import qualified Data.Text.IO                 as T
 
 import qualified ASCII                        as A
 import qualified ASCII.Char                   as A
+import           ASCII.Decimal                (Digit (..))
+import qualified Data.ByteString.Lazy         as LBS
 import           Network.Simple.TCP           (HostPreference (..), serve)
 import qualified Network.Simple.TCP           as Net
 import           Network.Socket               (Socket)
@@ -28,9 +30,6 @@ import qualified System.Directory             as Dir
 import           System.FilePath              ((</>))
 import qualified System.IO                    as IO
 import           System.IO                    (hShow)
-
-
-
 
 
 getDataDir :: IO FilePath
@@ -318,3 +317,38 @@ testHello = runResourceT @IO do
     repeatUntilNothing (Net.recv s 1024) BS.putStr
     Net.closeSock s
 
+
+data Request = Request RequestLine [HeaderField] (Maybe MessageBody)
+data Response = Response StatusLine [HeaderField] (Maybe MessageBody)
+
+data RequestLine = RequestLine Method RequestTarget HttpVersion
+
+newtype Method = Method BS.ByteString
+
+newtype RequestTarget = RequestTarget BS.ByteString
+
+data StatusLine = StatusLine HttpVersion StatusCode ReasonPhrase
+data StatusCode = StatusCode A.Digit A.Digit A.Digit
+newtype ReasonPhrase = ReasonPhrase BS.ByteString
+data HeaderField = HeaderField FieldName FieldValue
+newtype FieldName = FieldName BS.ByteString
+newtype FieldValue = FieldValue BS.ByteString
+newtype MessageBody = MessageBody LBS.ByteString
+data HttpVersion = HttpVersion A.Digit A.Digit
+
+helloRequest :: Request
+helloRequest = Request start [host, lang] Nothing
+  where
+  start = RequestLine (Method [A.string|GET|]) (RequestTarget [A.string|/|]) (HttpVersion ASCII.Decimal.Digit1 ASCII.Decimal.Digit1)
+  host = HeaderField (FieldName [A.string|Host|]) (FieldValue [A.string|haskell.org|])
+  lang = HeaderField (FieldName [A.string|Accept-Language|]) (FieldValue [A.string|en-US,en;q=0.5|])
+
+helloResponse :: Response
+helloResponse = Response start [server, date, contentType, contentLength] (Just body)
+  where
+  start = StatusLine (HttpVersion ASCII.Decimal.Digit1 ASCII.Decimal.Digit1) (StatusCode ASCII.Decimal.Digit2 ASCII.Decimal.Digit0 ASCII.Decimal.Digit0) (ReasonPhrase [A.string|OK|])
+  server = HeaderField (FieldName [A.string|Server|]) (FieldValue [A.string|sockets-and-pipes|])
+  date = HeaderField (FieldName [A.string|Date|]) (FieldValue [A.string|Mon, 23 Aug 2021 20:00:00 GMT|])
+  contentType = HeaderField (FieldName [A.string|Content-Type|]) (FieldValue [A.string|text/plain; charset=us-ascii|])
+  contentLength = HeaderField (FieldName [A.string|Content-Length|]) (FieldValue [A.string|6|])
+  body = MessageBody [A.string|Hello!|]
